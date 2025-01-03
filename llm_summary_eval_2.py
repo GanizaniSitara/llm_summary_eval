@@ -2,53 +2,99 @@ import time
 import webbrowser
 import os
 from datetime import datetime
-from mailbox_operations import analyze_db, analyze_mbx, extract_article_links, extract_all_article_links_from_mbx
+from mailbox_operations import extract_all_article_links_from_mbx
 import ollama
 from bs4 import BeautifulSoup
 import re
 import urllib
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError
+
 import csv
 
+MAIL_LINKS_FILE_START_ROW = 44
+MAIL_LINKS_FILE_NUM_RECORDS = 1
 
-SYSTEM = "You are a summarization assistant."
+# SYSTEM = "You are a summarization assistant."
+SYSTEM = "You only answer in form of long-form hypnotic script."
+# You are a verbose writer of hypnotic script embodying a very dominant persona, devious and fun, you like watching them squirm.
+
 USER = "Provide once sentence summary of the text. Start the sentence with a verb like describes, explains or similar. TEXT START:\n\n"
-TEMPERATURE = 0.6
+
+long_promt = "Elaborate on the question asked"
+
+PROMPTS = [
+    "Summarize this text in one sentence, capturing its main idea.",
+    "Provide a concise summary of this text in no more than three sentences.",
+    "Distill the key points of this text into a brief paragraph.",
+    "In 1-3 sentences, summarize the essential message of this passage.",
+    "Create a one-line overview that encapsulates the text's core theme.",
+    "Summarize this content in a way that highlights the most important details, keeping it under 50 words.",
+    "Provide a short, focused summary of this text, no longer than three lines.",
+    "Offer a concise recap of the main ideas from this passage in one or two sentences.",
+    "Write a brief paragraph summarizing the most significant aspects of this text.",
+    "Condense this content into a few sentences that capture its essence clearly and succinctly."
+]
+TEMPERATURE = 0.8
 MODELS = [
-            # small models
-            # "phi3:3.8b",
-            #"phi3:latest",
-            #"phi3:3.8b-mini-128k-instruct-q4_K_M",
-            # "qwen2:latest",
-            #"llama3.1:latest",
-            #"gemma2:latest",
+            # # LLAMA
+            # # small models < 8GB
             # "llama3.2:3b-instruct-fp16",
-            #"llama3.2-vision:latest",
-            #"phi3:14b",
-
-            # medium models
-            # "phi3:14b-medium-128k-instruct-q8_0",
-            # "gemma2:27b",
+            # "llama3.2-vision:11b-instruct-fp16",
+            #
+            # # medium models 8GB - 24GB
             # "llama3.1:8b-instruct-fp16",
-            # "qwen2.5-coder:32b",
-            # "command-r:latest",
-            # "command-r:35b-v0.1-q4_1",
-            # "jean-luc/big-tiger-gemma:27b-v1c-Q6_K",
-
-            # large models
+            #
+            # # large models 24GB -  48GB
+            # "llama3.1:70b-instruct-q4_K_M",
+            # "llama3.2-vision:11b-instruct-fp16",
+            # "llama3.3:70b-instruct-q2_K",
+            # "llama3.3:70b-instruct-q4_K_M",
+            #
+            # # PHI
+            # # small models < 8GB
+            # "phi3:3.8b",
+            # "phi3:3.8b-mini-128k-instruct-q4_K_M",
+            # "phi3:14b",
+            #
+            # # medium models 8GB - 24GB
+            # "phi3:14b-medium-128k-instruct-q8_0",
+            #
+            # # large models 24GB -  48GB
             # "phi3:14b-medium-128k-instruct-fp16",
+            #
+            # #QWEN
+            # # large models 24GB -  48GB
             # "qwen2.5:32b-instruct-q8_0",
             # "qwen2.5-coder:32b-instruct-q8_0",
-            # "qwen:72b", # ends up running on CPU on 2x3090 ... :(
-            # "llama3.1:70b-instruct-q4_K_M",
             # "qwen2.5:72b-instruct-q4_K_S", # this one too, runs on CPU on 2x3090
-            "llama3.2-vision:11b-instruct-fp16",
-            "command-r-plus:104b-08-2024-q3_K_S" # Still doesn't fit at 46GB
-            # ollama run command-r-plus:104b-08-2024-q2_K #this one is 39GB
+            #
+            # # STARCODER
+            # # large models 24GB -  48GB
+            # "starcoder2:15b-fp16",
+            #
+            # # GEMMA
+            # # small models < 8GB
+            # "gemma2:9b",
+            #
+            # # medium models 8GB - 24GB
+            # "gemma2:27b",
 
+            # # OPENAI
+            # # only runs once to save tokens, see code
+            # "gpt-4o-mini-2024-07-18",
 
+            # # Uncensored
+            # "vanilj/theia-21b-v1",
+            # "dolphin-mixtral:8x22b-v2.9-q2_K",
+            # "dolphin-mixtral:8x7b-v2.5-q6_K",
+            # "jean-luc/big-tiger-gemma:27b-v1c-Q6_K", # spanks GPU, runs on both in parallel (interesting), last one that spanks it
 
-            # Already tested
+            # Previously tested models
+            # "qwen:72b", # ends up running on CPU on 2x3090 ... :( too slow on our rig
+            # "command-r-plus:104b-08-2024-q2_K", #this one is 39GB, runs but still stresses CPU (but GPU also used now)
+            # "command-r:latest", # GPU heavy, runs on both at about 50% each, and long, certainly longer than measured times
+            # "command-r:35b-v0.1-q4_1", # GPU heavy, runs on both at about 50% each, and long, certainly longer than measured times
+            # "command-r-plus:104b-08-2024-q3_K_S" # Still doesn't fit at 46GB, that is runs on CPU and slow
             # "command-r-plus:104b", # 55GB,need to drop to q3_K_S
             # "llama3.2-vision:90b", # on CPU, no quantization that will run on 2x3090 in VRAM
             # "phi3:14b", # take instruct not the genral one
@@ -59,13 +105,7 @@ MODELS = [
             # "command-r:latest", # not amazing
             # "llama3.1", # needs to be instruct? verbal diarrhea
             # "llama3.1:70b", # ditto
-
-            # OPENAI
-            # only runs once to save tokens, see code
-            # "gpt-4o-mini-2024-07-18",
           ]
-
-
 
 
 def fetch_medium_content_from_freediumdotcfg_with_playwright(url, timeout=10000) -> str:
@@ -80,8 +120,13 @@ def fetch_medium_content_from_freediumdotcfg_with_playwright(url, timeout=10000)
         browser = p.chromium.launch_persistent_context('playwright', headless=False)
         page = browser.new_page()
 
-        page.goto(url)
-        page.wait_for_load_state('networkidle', timeout=timeout)
+        try:
+            page.goto(url, timeout=timeout)
+            page.wait_for_load_state('networkidle', timeout=timeout)
+        except TimeoutError:
+            print(f"TimeoutError: Failed to load the page within {timeout}ms")
+            browser.close()
+            return ""
 
         popup_buttons = [
             'button:text("Close")',
@@ -119,6 +164,7 @@ def fetch_medium_content_from_freediumdotcfg_with_playwright(url, timeout=10000)
 
     return text_content
 
+
 def translate_medium_url(original_url):
     # Parse the original URL
     parsed_url = urllib.parse.urlparse(original_url)
@@ -133,9 +179,11 @@ def translate_medium_url(original_url):
 
     return new_url
 
+
 def is_time_string(token):
     # Detect if the token is part of a time string like (Time: xx.x)
     return re.match(r'\(?Time:[^)]*\)?', token)
+
 
 def highlight_differences_in_html(html_content):
     import string  # Ensure string module is imported
@@ -154,7 +202,9 @@ def highlight_differences_in_html(html_content):
             for i, run_text in enumerate(run_texts):
                 # Tokenize the text including words, punctuation, and whitespace
                 # Adjusted regex to better capture words with periods and numbers
-                tokens = re.findall(r'\s+|\w+[\w\.\d]*|[^\w\s]', run_text)
+
+                # old tokens = re.findall(r'\s+|\w+[\w\.\d]*|[^\w\s]', run_text)
+                tokens = re.findall(r'\s+|\w+[\w\.]*|[^\w\s]', run_text)
                 normalized_words_set = set()
                 tokens_with_normalized = []
 
@@ -225,8 +275,7 @@ def read_urls_from_file(file_path):
     return urls
 
 
-
-def summarize_with_ollama(text, model="", system=SYSTEM, user=USER):
+def send_to_ollama(text, model="", system=SYSTEM, user=USER):
     """
     Summarize text using Ollama library.
 
@@ -260,17 +309,6 @@ def summarize_with_ollama(text, model="", system=SYSTEM, user=USER):
         return(completion.choices[0].message.content)
 
 
-def read_paths_from_file(file_path):
-    """
-    Read file paths from a text file, one path per line.
-
-    :param file_path: Path to the text file containing file paths
-    :return: List of file paths
-    """
-    with open(file_path, 'r') as file:
-        paths = [line.strip() for line in file if line.strip()]
-    return paths
-
 def fetch_and_summarize(url, title = None):
     content = fetch_medium_content_from_freediumdotcfg_with_playwright(url)
     # content = chop_off_intro(content) # this was for legacy method of extraction from Freedium
@@ -280,13 +318,15 @@ def fetch_and_summarize(url, title = None):
         model_results = [model]
         repetition = 1 if model == "gpt-4o-mini-2024-07-18" else 3
 
+        #print(f"{model} START: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        model_start_time = time.time()
         total_time = 0
         if model != "gpt-4o-mini-2024-07-18":
             ollama.chat(model=model, messages=[{"role": "system", "content": ""},
                 {"role": "user", "content": ""}],keep_alive="30s")
         for i in range(repetition):
             time_now = time.time()
-            summary = summarize_with_ollama(content, model)
+            summary = send_to_ollama(content, model)
             time_taken = time.time() - time_now
             total_time += time_taken
 
@@ -298,7 +338,11 @@ def fetch_and_summarize(url, title = None):
         all_results.append(model_results)
 
         avg_time = total_time / repetition
-        print(f"Model: {model}, Average time: {avg_time:.2f} seconds")
+        #print(f"{model} END: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        model_end_time = time.time()
+        model_time = model_end_time - model_start_time
+        #print(f"{model} TOTAL: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Model: {model}, Average: {avg_time:.2f}s, Total: {model_time:.2f}s")
 
     html_output = """
     <html>
@@ -356,6 +400,85 @@ def fetch_and_summarize(url, title = None):
 
     webbrowser.open(f"file://{highlighted_filename}")
 
+def process_question(question):
+    """
+    Process a question and summarize it using the models.
+    """
+    all_results = []
+
+    for model in MODELS:
+        model_results = [model]
+        repetition = 1 if model == "gpt-4o-mini-2024-07-18" else 3
+
+        model_start_time = time.time()
+        total_time = 0
+
+        if model != "gpt-4o-mini-2024-07-18":
+            ollama.chat(model=model, messages=[{"role": "system", "content": ""},
+                {"role": "user", "content": ""}], keep_alive="30s")
+
+        for i in range(repetition):
+            time_now = time.time()
+            summary = send_to_ollama(question, model, system=SYSTEM, user=question)
+            time_taken = time.time() - time_now
+            total_time += time_taken
+            model_results.append(f"{summary}<br>(Time: {time_taken:.2f}s)")
+
+        model_results.extend([""] * (3 - repetition))
+        all_results.append(model_results)
+
+        avg_time = total_time / repetition
+        model_end_time = time.time()
+        model_time = model_end_time - model_start_time
+        print(f"Model: {model}, Average: {avg_time:.2f}s, Total: {model_time:.2f}s")
+
+    html_output = """
+    <html>
+    <head>
+        <style>
+            table {{ border-collapse: collapse; width: 100%; }}
+            th, td {{ border: 1px solid black; padding: 8px; text-align: left; width: 25%; }}
+            th {{ background-color: #f2f2f2; }}
+        </style>
+    </head>
+    <body>
+        <p>Question: {question}</p>
+        <p>System Prompt: {system}</p>
+        <p>User Prompt: {user}</p>
+        <table>
+            <tr><th>Model</th><th>Run 1</th><th>Run 2</th><th>Run 3</th></tr>
+    """.format(
+        question=question, system=SYSTEM, user=USER)
+
+    for result in all_results:
+        html_output += "<tr>"
+        for cell in result:
+            html_output += f"<td>{cell}</td>"
+        html_output += "</tr>"
+
+    html_output += """
+        </table>
+    </body>
+    </html>
+    """
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"summary_table_{timestamp}.html"
+
+    with open(filename, "w", encoding='utf-8') as f:
+        f.write(html_output)
+
+    print(f"Summary table has been written to '{filename}'")
+
+    webbrowser.open(f"file://{filename}")
+
+def process_question_prompt(prompt):
+    """
+    Process a question prompt from the user.
+    """
+    question = prompt if prompt else input("Please enter your question: ")
+    process_question(question)
+
 
 def process_articles_from_csv(csv_path, start_row=0, num_records=None):
     """
@@ -384,12 +507,13 @@ def process_articles_from_csv(csv_path, start_row=0, num_records=None):
             print("X" * 50)
 
 
-def main(source='email', file_path=None):
+def main(source='email', file_path=None, prompt=None):
     db_path = r'C:\Users\admin\AppData\Local\OEClassic\User\Main Identity\00_Medium.db'
     mbx_path = r'C:\Users\admin\AppData\Local\OEClassic\User\Main Identity\00_Medium.mbx'
     csv_path = 'extracted_articles.csv'
 
     start_time = time.time()
+    print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     if source == 'file':
         if not file_path:
@@ -403,22 +527,31 @@ def main(source='email', file_path=None):
             print("X" * 50)
             print("X" * 50)
 
-    elif source == 'local_files':
-        pass
+    elif source == 'prompt':
+        process_question_prompt(prompt)
 
     elif source == 'email':
         print("Analyzing mail storage...")
         extract_all_article_links_from_mbx(mbx_path, csv_path)
-        process_articles_from_csv('extracted_articles.csv', start_row=25, num_records=1)
+        process_articles_from_csv('extracted_articles.csv',
+                                  start_row=MAIL_LINKS_FILE_START_ROW,
+                                  num_records=MAIL_LINKS_FILE_NUM_RECORDS)
 
     else:
         raise ValueError("Invalid source. Must be 'email', 'file', or 'local_files'.")
 
     end_time = time.time()
     execution_time = end_time - start_time
+    print(f"End time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Execution time: {execution_time:.2f} seconds.")
 
+
 if __name__ == "__main__":
-    #source = 'file'
-    source = 'email'
-    main(source=source, file_path='urls.txt')
+    # source = 'file'
+    source = 'prompt'
+    if source == 'file':
+        main(source=source, file_path='urls.txt')
+    elif source == 'email':
+        main(source=source)
+    elif source == 'prompt':
+        main(source=source, prompt=long_promt)
