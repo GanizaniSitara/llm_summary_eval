@@ -8,107 +8,45 @@ from bs4 import BeautifulSoup
 import re
 import urllib
 from playwright.sync_api import sync_playwright, TimeoutError
-
 import csv
+from config import SOURCE, MAIL_LINKS_FILE_START_ROW, MAIL_LINKS_FILE_NUM_RECORDS, SYSTEM, USER, PROMPTS, TEMPERATURE, MODELS, DB_PATH, MBX_PATH, CSV_PATH
 
-MAIL_LINKS_FILE_START_ROW = 44
-MAIL_LINKS_FILE_NUM_RECORDS = 1
+def generate_html_output(title, url, system, user, all_results):
+    html_output = """
+    <html>
+    <head>
+        <style>
+            table {{ border-collapse: collapse; width: 100%; }}
+            th, td {{ border: 1px solid black; padding: 8px; text-align: left; width: 25%; }}
+            th {{ background-color: #f2f2f2; }}
+        </style>
+    </head>
+    <body>        
+        {title_section}       
+        <p>URL Examined: <a href="{url}">{url}</a></p>
+        <p>System Prompt: {system}</p>
+        <p>User Prompt: {user}</p>
+        <table>
+            <tr><th>Model</th><th>Run 1</th><th>Run 2</th><th>Run 3</th></tr>
+    """.format(
+        title_section=f"<h2>{title}</h2>" if title else "",
+        url=url, system=system, user=user)
 
-# SYSTEM = "You are a summarization assistant."
-SYSTEM = "You only answer in form of long-form hypnotic script."
-# You are a verbose writer of hypnotic script embodying a very dominant persona, devious and fun, you like watching them squirm.
+    for result in all_results:
+        html_output += "<tr>"
+        for cell in result:
+            html_output += f"<td>{cell}</td>"
+        html_output += "</tr>"
 
-USER = "Provide once sentence summary of the text. Start the sentence with a verb like describes, explains or similar. TEXT START:\n\n"
-
-long_promt = "Elaborate on the question asked"
-
-PROMPTS = [
-    "Summarize this text in one sentence, capturing its main idea.",
-    "Provide a concise summary of this text in no more than three sentences.",
-    "Distill the key points of this text into a brief paragraph.",
-    "In 1-3 sentences, summarize the essential message of this passage.",
-    "Create a one-line overview that encapsulates the text's core theme.",
-    "Summarize this content in a way that highlights the most important details, keeping it under 50 words.",
-    "Provide a short, focused summary of this text, no longer than three lines.",
-    "Offer a concise recap of the main ideas from this passage in one or two sentences.",
-    "Write a brief paragraph summarizing the most significant aspects of this text.",
-    "Condense this content into a few sentences that capture its essence clearly and succinctly."
-]
-TEMPERATURE = 0.8
-MODELS = [
-            # # LLAMA
-            # # small models < 8GB
-            # "llama3.2:3b-instruct-fp16",
-            # "llama3.2-vision:11b-instruct-fp16",
-            #
-            # # medium models 8GB - 24GB
-            # "llama3.1:8b-instruct-fp16",
-            #
-            # # large models 24GB -  48GB
-            # "llama3.1:70b-instruct-q4_K_M",
-            # "llama3.2-vision:11b-instruct-fp16",
-            # "llama3.3:70b-instruct-q2_K",
-            # "llama3.3:70b-instruct-q4_K_M",
-            #
-            # # PHI
-            # # small models < 8GB
-            # "phi3:3.8b",
-            # "phi3:3.8b-mini-128k-instruct-q4_K_M",
-            # "phi3:14b",
-            #
-            # # medium models 8GB - 24GB
-            # "phi3:14b-medium-128k-instruct-q8_0",
-            #
-            # # large models 24GB -  48GB
-            # "phi3:14b-medium-128k-instruct-fp16",
-            #
-            # #QWEN
-            # # large models 24GB -  48GB
-            # "qwen2.5:32b-instruct-q8_0",
-            # "qwen2.5-coder:32b-instruct-q8_0",
-            # "qwen2.5:72b-instruct-q4_K_S", # this one too, runs on CPU on 2x3090
-            #
-            # # STARCODER
-            # # large models 24GB -  48GB
-            # "starcoder2:15b-fp16",
-            #
-            # # GEMMA
-            # # small models < 8GB
-            # "gemma2:9b",
-            #
-            # # medium models 8GB - 24GB
-            # "gemma2:27b",
-
-            # # OPENAI
-            # # only runs once to save tokens, see code
-            # "gpt-4o-mini-2024-07-18",
-
-            # # Uncensored
-            # "vanilj/theia-21b-v1",
-            # "dolphin-mixtral:8x22b-v2.9-q2_K",
-            # "dolphin-mixtral:8x7b-v2.5-q6_K",
-            # "jean-luc/big-tiger-gemma:27b-v1c-Q6_K", # spanks GPU, runs on both in parallel (interesting), last one that spanks it
-
-            # Previously tested models
-            # "qwen:72b", # ends up running on CPU on 2x3090 ... :( too slow on our rig
-            # "command-r-plus:104b-08-2024-q2_K", #this one is 39GB, runs but still stresses CPU (but GPU also used now)
-            # "command-r:latest", # GPU heavy, runs on both at about 50% each, and long, certainly longer than measured times
-            # "command-r:35b-v0.1-q4_1", # GPU heavy, runs on both at about 50% each, and long, certainly longer than measured times
-            # "command-r-plus:104b-08-2024-q3_K_S" # Still doesn't fit at 46GB, that is runs on CPU and slow
-            # "command-r-plus:104b", # 55GB,need to drop to q3_K_S
-            # "llama3.2-vision:90b", # on CPU, no quantization that will run on 2x3090 in VRAM
-            # "phi3:14b", # take instruct not the genral one
-            # "phi3","phi3.5" # crap
-            # "dolphin-mixtral:8x22b", # good but slow, high CPU doesn't fit into 2x3090, overflows to RAM
-            # "dolphin-mixtral", # too verbose
-            # "llama3.1:70b-instruct-fp16", # 143GB don't run this locally 48GB VRAM and 64GB RAM is not enough
-            # "command-r:latest", # not amazing
-            # "llama3.1", # needs to be instruct? verbal diarrhea
-            # "llama3.1:70b", # ditto
-          ]
+    html_output += """
+        </table>
+    </body>
+    </html>
+    """
+    return html_output
 
 
-def fetch_medium_content_from_freediumdotcfg_with_playwright(url, timeout=10000) -> str:
+def fetch_content_with_playwright(url, timeout=10000) -> str:
     """
     Fetch content from a URL using Playwright.
 
@@ -308,73 +246,38 @@ def send_to_ollama(text, model="", system=SYSTEM, user=USER):
         )
         return(completion.choices[0].message.content)
 
+def run_model_through_ollama(content, model, system_prompt, user_prompt, repetition=3):
+    model_results = [model]
+    total_time = 0
 
-def fetch_and_summarize(url, title = None):
-    content = fetch_medium_content_from_freediumdotcfg_with_playwright(url)
-    # content = chop_off_intro(content) # this was for legacy method of extraction from Freedium
+    if model != "gpt-4o-mini-2024-07-18":
+        ollama.chat(model=model, messages=[{"role": "system", "content": ""}, {"role": "user", "content": ""}], keep_alive="30s")
+
+    for i in range(repetition):
+        time_now = time.time()
+        summary = send_to_ollama(content, model, system=system_prompt, user=user_prompt)
+        time_taken = time.time() - time_now
+        total_time += time_taken
+        model_results.append(f"{summary}<br>(Time: {time_taken:.2f}s)")
+
+    model_results.extend([""] * (3 - repetition))
+    avg_time = total_time / repetition
+    return model_results, avg_time
+
+def summarize_url(url, title = None):
+    content = fetch_content_with_playwright(url)
     all_results = []
 
     for model in MODELS:
-        model_results = [model]
         repetition = 1 if model == "gpt-4o-mini-2024-07-18" else 3
-
-        #print(f"{model} START: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         model_start_time = time.time()
-        total_time = 0
-        if model != "gpt-4o-mini-2024-07-18":
-            ollama.chat(model=model, messages=[{"role": "system", "content": ""},
-                {"role": "user", "content": ""}],keep_alive="30s")
-        for i in range(repetition):
-            time_now = time.time()
-            summary = send_to_ollama(content, model)
-            time_taken = time.time() - time_now
-            total_time += time_taken
-
-            model_results.append(f"{summary}<br>(Time: {time_taken:.2f}s)")
-
-        # Fill empty cells if less than 3 repetitions
-        model_results.extend([""] * (3 - repetition))
-
+        model_results, avg_time = run_model_through_ollama(content, model, SYSTEM, USER, repetition)
         all_results.append(model_results)
-
-        avg_time = total_time / repetition
-        #print(f"{model} END: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         model_end_time = time.time()
         model_time = model_end_time - model_start_time
-        #print(f"{model} TOTAL: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"Model: {model}, Average: {avg_time:.2f}s, Total: {model_time:.2f}s")
 
-    html_output = """
-    <html>
-    <head>
-        <style>
-            table {{ border-collapse: collapse; width: 100%; }}
-            th, td {{ border: 1px solid black; padding: 8px; text-align: left; width: 25%; }}
-            th {{ background-color: #f2f2f2; }}
-        </style>
-    </head>
-    <body>        
-        {title_section}       
-        <p>URL Examined: <a href="{url}">{url}</a></p>
-        <p>System Prompt: {system}</p>
-        <p>User Prompt: {user}</p>
-        <table>
-            <tr><th>Model</th><th>Run 1</th><th>Run 2</th><th>Run 3</th></tr>
-    """.format(
-        title_section = f"<h2>{title}</h2>" if title else "",
-        url=url, system=SYSTEM, user=USER)
-
-    for result in all_results:
-        html_output += "<tr>"
-        for cell in result:
-            html_output += f"<td>{cell}</td>"
-        html_output += "</tr>"
-
-    html_output += """
-        </table>
-    </body>
-    </html>
-    """
+    html_output = generate_html_output(title, url, SYSTEM, USER, all_results)
 
     # Generate timestamped filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -401,66 +304,18 @@ def fetch_and_summarize(url, title = None):
     webbrowser.open(f"file://{highlighted_filename}")
 
 def process_question(question):
-    """
-    Process a question and summarize it using the models.
-    """
     all_results = []
 
     for model in MODELS:
-        model_results = [model]
         repetition = 1 if model == "gpt-4o-mini-2024-07-18" else 3
-
         model_start_time = time.time()
-        total_time = 0
-
-        if model != "gpt-4o-mini-2024-07-18":
-            ollama.chat(model=model, messages=[{"role": "system", "content": ""},
-                {"role": "user", "content": ""}], keep_alive="30s")
-
-        for i in range(repetition):
-            time_now = time.time()
-            summary = send_to_ollama(question, model, system=SYSTEM, user=question)
-            time_taken = time.time() - time_now
-            total_time += time_taken
-            model_results.append(f"{summary}<br>(Time: {time_taken:.2f}s)")
-
-        model_results.extend([""] * (3 - repetition))
+        model_results, avg_time = run_model_through_ollama(question, model, SYSTEM, question, repetition)
         all_results.append(model_results)
-
-        avg_time = total_time / repetition
         model_end_time = time.time()
         model_time = model_end_time - model_start_time
         print(f"Model: {model}, Average: {avg_time:.2f}s, Total: {model_time:.2f}s")
 
-    html_output = """
-    <html>
-    <head>
-        <style>
-            table {{ border-collapse: collapse; width: 100%; }}
-            th, td {{ border: 1px solid black; padding: 8px; text-align: left; width: 25%; }}
-            th {{ background-color: #f2f2f2; }}
-        </style>
-    </head>
-    <body>
-        <p>Question: {question}</p>
-        <p>System Prompt: {system}</p>
-        <p>User Prompt: {user}</p>
-        <table>
-            <tr><th>Model</th><th>Run 1</th><th>Run 2</th><th>Run 3</th></tr>
-    """.format(
-        question=question, system=SYSTEM, user=USER)
-
-    for result in all_results:
-        html_output += "<tr>"
-        for cell in result:
-            html_output += f"<td>{cell}</td>"
-        html_output += "</tr>"
-
-    html_output += """
-        </table>
-    </body>
-    </html>
-    """
+    html_output = generate_html_output(None, None, SYSTEM, USER, all_results)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"summary_table_{timestamp}.html"
@@ -501,16 +356,16 @@ def process_articles_from_csv(csv_path, start_row=0, num_records=None):
             link = row['Link']
             translated_link = translate_medium_url(link)
             print(f"Processing article: {title}\n   Link: {translated_link}\n")
-            fetch_and_summarize(translated_link, title = title)
+            summarize_url(translated_link, title = title)
             print("X" * 50)
             print("X" * 50)
             print("X" * 50)
 
 
 def main(source='email', file_path=None, prompt=None):
-    db_path = r'C:\Users\admin\AppData\Local\OEClassic\User\Main Identity\00_Medium.db'
-    mbx_path = r'C:\Users\admin\AppData\Local\OEClassic\User\Main Identity\00_Medium.mbx'
-    csv_path = 'extracted_articles.csv'
+    db_path = DB_PATH
+    mbx_path = MBX_PATH
+    csv_path = CSV_PATH
 
     start_time = time.time()
     print(f"Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -522,7 +377,7 @@ def main(source='email', file_path=None, prompt=None):
         urls = read_urls_from_file(file_path)
         for idx, url in enumerate(urls, 1):
             print(f"{idx}. URL: {url}")
-            fetch_and_summarize(url)
+            summarize_url(url)
             print("X" * 50)
             print("X" * 50)
             print("X" * 50)
@@ -547,11 +402,13 @@ def main(source='email', file_path=None, prompt=None):
 
 
 if __name__ == "__main__":
-    # source = 'file'
-    source = 'prompt'
-    if source == 'file':
-        main(source=source, file_path='urls.txt')
-    elif source == 'email':
-        main(source=source)
-    elif source == 'prompt':
-        main(source=source, prompt=long_promt)
+    if SOURCE == 'file':
+        main(source=SOURCE, file_path='urls.txt')
+    elif SOURCE == 'email':
+        main(source=SOURCE)
+    elif SOURCE == 'prompt':
+        main(source=SOURCE, prompt=USER)
+    elif SOURCE == 'confluence':
+        main(source=SOURCE)
+    else:
+        raise ValueError("Invalid source. Must be 'email', 'file', 'prompt', or 'confluence'.")
