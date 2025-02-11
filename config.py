@@ -104,3 +104,228 @@ MODELS = [
 DB_PATH = r'C:\Users\admin\AppData\Local\OEClassic\User\Main Identity\00_Medium.db'
 MBX_PATH = r'C:\Users\admin\AppData\Local\OEClassic\User\Main Identity\00_Medium.mbx'
 CSV_PATH = 'extracted_articles.csv'
+
+prompts_dict = {
+    "product_vision": [
+        """Rate the relevance of the provided document to **documenting product vision** on a scale of 0 to 100, based on the following:
+
+        - 0: The document has no product vision content.
+        - 50: The document mentions product vision but lacks depth.
+        - 100: The document provides highly detailed product vision information.
+
+        Output **only** the score as a single integer. No explanations or extra text.
+
+        Example output:
+        75
+        """,
+        """From the provided text, evaluate how relevant it is for **product vision documentation**. Respond with a single number (0-100).
+
+        Only output a number. No explanation.
+        """,
+        """You are an evaluator tasked with rating a document's relevance for **product vision documentation** on a scale of 0-100. 
+
+        Consider:
+        - Does it describe the product vision clearly?
+        - Does it include details like goals, roadmap, target users, and strategic direction?
+
+        Provide **only** a single number as your output. Do not explain.
+
+        Example:
+        42
+        """,
+        """Imagine you're reviewing a technical document for product vision relevance. Your task is to assign it a score from 0 to 100:
+
+        - 0: No product vision content.
+        - 100: Fully detailed product vision documentation.
+
+        Your response should be just the number, nothing else.
+        """,
+        """Review the document below for how well it documents product vision. Return the relevance score as an integer between 0 and 100.
+
+        **Output format:**
+        `score = <integer>`
+
+        Example:
+        `score = 85`
+        """,
+        """Assess the provided document for its relevance to **product vision documentation**. 
+
+        - 0: No product vision content.
+        - 100: Fully detailed product vision documentation.
+
+        Provide only a single number as your output. No extra text.
+        """,
+        """Evaluate how well the document captures **product vision**. Rate it from 0 to 100 based on clarity, depth, and strategic insight.
+
+        Output only a single integer. No explanations or additional text.
+        """
+    ],
+    "product_roadmap": [
+        """Rate the relevance of the provided document to **documenting a product roadmap** on a scale of 0 to 100:
+
+        - 0: No roadmap content.
+        - 50: Mentions roadmap but lacks depth.
+        - 100: Detailed roadmap with milestones and timelines.
+
+        Output only the score as an integer.
+        """,
+        """Evaluate the document for its usefulness in capturing a **product roadmap**. Rate from 0 to 100. 
+
+        Respond with only a number. No extra text.
+        """,
+        """Does the document clearly define the **product roadmap**? Consider clarity, milestones, timelines, and priorities.
+
+        Rate from 0 to 100. Output only the score.
+        """,
+        """Assess how effectively the document presents a **product roadmap**. 
+
+        - 0: No roadmap content.
+        - 100: A fully structured and actionable roadmap.
+
+        Respond only with a single integer.
+        """,
+        """How well does the document describe the **product roadmap**, including phases, milestones, and dependencies? 
+
+        Provide only a number between 0 and 100.
+        """,
+        """On a scale of 0 to 100, rate the document's effectiveness in presenting a **product roadmap** with key strategic steps. 
+
+        Return only the number.
+        """,
+        """Examine the document's relevance to **product roadmap documentation**. 
+
+        - 0: No roadmap-related details.
+        - 100: A well-defined roadmap with clear sequencing.
+
+        Output only the score.
+        """
+    ],
+    "architecture_vision": [
+        """Rate how well the document conveys an **architecture vision** on a scale from 0 to 100:
+
+        - 0: No architectural vision content.
+        - 50: Mentions architecture but lacks structure.
+        - 100: A comprehensive and strategic architecture vision.
+
+        Provide only a single integer score.
+        """,
+        """Evaluate the document for its relevance to **architecture vision**. 
+
+        Return a number from 0 to 100. No explanation.
+        """,
+        """Does the document define an **architecture vision** with clear objectives, guiding principles, and future direction?
+
+        Rate from 0 to 100 and output only the score.
+        """,
+        """Review the document's **architecture vision**. 
+
+        - 0: No vision articulated.
+        - 100: A strong and well-defined architecture vision.
+
+        Provide only a single integer.
+        """,
+        """How well does the document outline an **architecture vision**, including principles, components, and evolution?
+
+        Respond with only a number from 0 to 100.
+        """,
+        """Assess the document’s clarity and completeness in defining an **architecture vision**. 
+
+        Provide only a single number between 0 and 100.
+        """,
+        """Evaluate how structured and forward-looking the **architecture vision** is. 
+
+        Output a single integer from 0 to 100.
+        """
+    ],
+    "service_vision": [
+        """Rate the provided document’s relevance to defining a **service vision** from 0 to 100:
+
+        - 0: No service vision details.
+        - 100: Clear, structured, and strategic service vision.
+
+        Output only a single integer.
+        """,
+        """Assess the document for how well it defines a **service vision**. 
+
+        Provide only a score from 0 to 100.
+        """,
+        """Does the document explain a compelling **service vision**, including scope, objectives, and value? 
+
+        Respond with only a number between 0 and 100.
+        """,
+        """How effectively does the document define a **service vision** for future development and customer impact? 
+
+        Provide a single number from 0 to 100.
+        """,
+        """Evaluate the **service vision** clarity and strategic alignment. 
+
+        Return only a number from 0 to 100.
+        """,
+        """Assess whether the document clearly articulates a **service vision** that aligns with customer needs and business objectives.
+
+        Respond with only a number from 0 to 100.
+        """,
+        """Rate how well the document presents a **service vision** in terms of strategy, execution, and long-term goals. 
+
+        Provide only a number from 0 to 100.
+        """
+    ],
+    "security_vision": [
+        """Rate the document’s relevance in defining a **security vision** from 0 to 100:
+
+        - 0: No security-related vision.
+        - 100: A comprehensive and well-structured security vision.
+
+        Output only an integer.
+        """,
+        """Evaluate how well the document presents a **security vision**, covering risks, strategy, and controls. 
+
+        Return only a score from 0 to 100.
+        """,
+        """Does the document outline a structured **security vision**, including principles and risk management? 
+
+        Provide only a number from 0 to 100.
+        """,
+        """Assess the clarity and depth of the **security vision** within the document. 
+
+        Respond with only a number from 0 to 100.
+        """,
+        """How effectively does the document define a **security vision** that aligns with organizational goals? 
+
+        Provide only a score from 0 to 100.
+        """,
+        """Examine the document’s ability to convey a long-term **security vision**. 
+
+        Respond only with a number from 0 to 100.
+        """,
+        """Rate the comprehensiveness of the **security vision** in the document, from 0 to 100. 
+
+        Output only a single integer.
+        """
+    ],
+    "lean_test_strategy": [
+        """Rate how well the document defines a **lean test strategy** from 0 to 100:
+
+        - 0: No test strategy content.
+        - 100: A well-defined, efficient lean test strategy.
+
+        Output only a single integer.
+        """,
+        """Evaluate the document’s relevance for describing a **lean test strategy**. 
+
+        Provide only a score from 0 to 100.
+        """,
+        """Does the document articulate an effective **lean test strategy**, balancing efficiency and coverage? 
+
+        Respond with only a number from 0 to 100.
+        """,
+        """How effectively does the document define a **lean test strategy**, including key principles and risk-based approaches? 
+
+        Provide a single number.
+        """,
+        """Assess the document’s clarity and depth in presenting a **lean test strategy**. 
+
+        Return only a number from 0 to 100.
+        """
+    ]
+}

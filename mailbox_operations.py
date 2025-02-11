@@ -127,63 +127,6 @@ def extract_article_links(html_content):
                 content_elements = container.contents
                 if len(content_elements) > 1:
                     second_content = content_elements[1]
-
-                    # Extract reading time
-                    # reading_time_tag = second_content.find('span', class_='ai dl dm dn do dp dq dr ds dt du at',
-                    #                                        string=lambda text: 'min read' in text)
-                    # reading_time = reading_time_tag.get_text(strip=True) if reading_time_tag else '0 min read'
-                    #
-                    # # Extract likes
-                    # likes_tag = second_content.find('span', class_='ai dl dm dn do dp dq dr ds dt du at')
-                    # likes = likes_tag.get_text(strip=True) if likes_tag else '0'
-                    #
-                    # # Extract comments
-                    # comments_tag = second_content.find_all('span', class_='ai dl dm dn do dp dq dr ds dt du at')
-                    # comments = comments_tag[-1].get_text(strip=True) if comments_tag else '0'
-
-                    # reading_time_tag = second_content.find('span', string=lambda text: text and 'min read' in text)
-                    # reading_time = reading_time_tag.get_text(strip=True) if reading_time_tag else '0 min read'
-                    #
-                    # # Extract likes and comments for the first content type, if available.
-                    # likes = '0'
-                    # comments = '0'
-                    #
-                    # likes_comments_tags = second_content.find_all('span', class_='ai dl dm dn do dp dq dr ds dt du at')
-                    #
-                    # if likes_comments_tags:
-                    #     # Assuming the first occurrence of the span is the likes.
-                    #     likes = likes_comments_tags[0].get_text(strip=True)
-                    #     # If there are more than one, we assume the last one is comments.
-                    #     if len(likes_comments_tags) > 1:
-                    #         comments = likes_comments_tags[-1].get_text(strip=True)
-                    #
-                    # # If likes/comments were not found, try to parse the second type of content.
-                    # if likes == '0' and comments == '0':
-                    #     reading_time_tag = second_content.find('span', class_='ai co cp au',
-                    #                                            string=lambda text: 'min read' in text)
-                    #     reading_time = reading_time_tag.get_text(strip=True) if reading_time_tag else '0 min read'
-                    #
-                    #     # Likes and comments extraction for the second type of content.
-                    #     likes_tags = second_content.find_all('img', alt='Claps')
-                    #     likes = likes_tags[0].find_next('span').get_text(strip=True) if likes_tags else '0'
-                    #
-                    #     comments_tags = second_content.find_all('img', alt='Responses')
-                    #     comments = comments_tags[0].find_next('span').get_text(strip=True) if comments_tags else '0'
-                    #
-                    # # Print warning if any of the tags are not found
-                    # if not reading_time_tag or not likes or not comments:
-                    #     missing_elements = []
-                    #     if not reading_time_tag:
-                    #         missing_elements.append('reading time')
-                    #     if not likes:
-                    #         missing_elements.append('likes')
-                    #     if not comments:
-                    #         missing_elements.append('comments')
-                    #     print(f"Warning: {', '.join(missing_elements)} not found for article '{title}'")
-                    # else:
-                    #     print(f"{reading_time}, {likes}, {comments} Title: {title}")
-
-                    # reading_time, comments, likes # to be used later
                     articles.append((title, href, title, 0))
 
                 else:
