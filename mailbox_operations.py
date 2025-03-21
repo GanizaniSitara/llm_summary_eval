@@ -1,222 +1,164 @@
+"""
+OE Classic Email Client Archive Operations
+
+This module provides utilities for working with email archives from the OE Classic 
+email client, particularly focusing on extracting article content and metadata.
+"""
+
+from typing import List, Tuple, Optional
 import sqlite3
 from email import policy
 from email.parser import BytesParser
 from bs4 import BeautifulSoup
 import csv
 
-def analyze_database(db_path):
-    db_count, db_email = analyze_db(db_path)
-    print(f"\nDatabase Analysis:")
-    print(f"Total emails in DB: {db_count}")
-    print("Top email from DB (id, subject, size, uidl):")
-    print(db_email)
-
-def analyze_db(db_path):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT COUNT(*) FROM mbx")
-    total_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT id, subjectStrip, size, uidl FROM mbx ORDER BY id LIMIT 1")
-    email_data = cursor.fetchone()
-
-    conn.close()
-    return total_count, email_data
-
-def analyze_mbx(mbx_path):
-    with open(mbx_path, 'rb') as file:
-        while True:
-            line = file.readline()
-            if not line:
-                break
-
-            line_str = line.decode('utf-8', errors='ignore').strip()
-
-            if line_str == '[hdr]':
-                mlen_line = file.readline()
-                if not mlen_line:
+class EmailStore:
+    """Represents an OE Classic email archive (.mbx file)"""
+    
+    def __init__(self, mbx_path: str):
+        self.mbx_path = mbx_path
+        
+    def get_message(self, message_id: int) -> Optional[Tuple[str, str]]:
+        """
+        Retrieve a specific email message by ID
+        Returns tuple of (subject, html_body) or None if not found
+        """
+        with open(self.mbx_path, 'rb') as file:
+            while True:
+                line = file.readline()
+                if not line:
                     break
-
-                mlen_str = mlen_line.decode('utf-8', errors='ignore').strip()
-                if mlen_str.startswith('mlen='):
-                    mlen_value = mlen_str[len('mlen='):]
-                    try:
-                        mlen = int(mlen_value, 16)
-                    except ValueError:
-                        print(f"Invalid mlen value: {mlen_value}")
-                        continue
-
-                    msg_line = file.readline()
-                    if not msg_line:
+                    
+                # Parse header and content sections
+                if line.strip() == '[hdr]':
+                    mlen_line = file.readline()
+                    if not mlen_line:
                         break
-
-                    msg_line_str = msg_line.decode('utf-8', errors='ignore').strip()
-                    if msg_line_str == '[msg]':
-                        msg_content = file.read(mlen)
-                        if len(msg_content) < mlen:
-                            print("Incomplete message content.")
-                            break
-
-                        parser = BytesParser(policy=policy.default)
+                        
+                    mlen_str = mlen_line.decode('utf-8', errors='ignore').strip()
+                    if mlen_str.startswith('mlen='):
                         try:
+                            mlen = int(mlen_str[len('mlen='):], 16)
+                        except ValueError:
+                            continue                            
+                        
+                        msg_line = file.readline()
+                        if not msg_line:
+                            break
+                            
+                        if msg_line.strip() == '[msg]':
+                            msg_content = file.read(mlen)
+                            parser = BytesParser(policy=policy.default)
                             email_message = parser.parsebytes(msg_content)
-                        except Exception as e:
-                            print(f"Error parsing email: {e}")
-                            return None, None
-
-                        subject = email_message['subject']
-                        html_body = ""
-                        if email_message.is_multipart():
-                            for part in email_message.walk():
-                                content_type = part.get_content_type()
-                                if content_type == 'text/html':
-                                    charset = part.get_content_charset()
-                                    html_body = part.get_payload(decode=True).decode(charset, errors='replace')
-                                    break
-                        else:
-                            if email_message.get_content_type() == 'text/html':
-                                charset = email_message.get_content_charset()
-                                html_body = email_message.get_payload(decode=True).decode(charset, errors='replace')
-
-                        return subject, html_body
-                    else:
-                        print(f"Expected '[msg]', but found: {msg_line_str}")
-                        break
-                else:
-                    print(f"Expected 'mlen=', but found: {mlen_str}")
+                            
+                            subject = email_message['subject']
+                            html_body = self._extract_html_body(email_message)
+                            return (subject, html_body)
+    
+    def _extract_html_body(self, message) -> str:
+        """Extract HTML body from email message"""
+        html_body = ""
+        if message.is_multipart():
+            for part in message.walk():
+                if part.get_content_type() == 'text/html':
+                    charset = part.get_content_charset()
+                    html_body = part.get_payload(decode=True).decode(charset, errors='replace')
                     break
-            else:
-                continue
+        elif message.get_content_type() == 'text/html':
+            charset = message.get_content_charset()
+            html_body = message.get_payload(decode=True).decode(charset, errors='replace')
+            
+        return html_body
 
-    return None, None
+class MessageParser:
+    """Parses email content to extract article metadata"""
+    
+    def __init__(self, html_content: str):
+        self.soup = BeautifulSoup(html_content, 'html.parser')
+        
+    def find_articles(self) -> List[Tuple[str, str]]:
+        """
+        Find all articles in the email content
+        Returns list of (title, url) tuples
+        """
+        articles = []
+        containers = self.soup.find_all('div', class_='cb cc cd ce cf cg ch ci cj')
+        
+        for container in containers:
+            title_tag = container.find('b', id=True)
+            if title_tag:
+                title = title_tag.get_text(strip=True)
+                link_tag = title_tag.find_parent('a', href=True)
+                if link_tag and link_tag.has_attr('href'):
+                    url = link_tag['href']
+                    articles.append((title, url))
+                    
+        return articles
 
-def extract_article_links_old(html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
-    articles = []
-
-    article_containers = soup.find_all('div', class_='cb cc cd ce cf cg ch ci cj')
-
-    for container in article_containers:
-        title_tag = container.find('b', id=True)
-        if title_tag:
-            title = title_tag.get_text(strip=True)
-            link_tag = title_tag.find_parent('a', href=True)
-            if link_tag:
-                href = link_tag['href']
-                articles.append((title, href))
-
-    return articles
-
-
-def extract_article_links(html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
-    articles = []
-
-    article_containers = soup.find_all('div', class_='cb cc cd ce cf cg ch ci cj')
-
-    for container in article_containers:
-        title_tag = container.find('b', id=True)
-        if title_tag:
-            title = title_tag.get_text(strip=True)
-            link_tag = title_tag.find_parent('a', href=True)
-            if link_tag:
-                href = link_tag['href']
-
-                # Target the second content element
-                content_elements = container.contents
-                if len(content_elements) > 1:
-                    second_content = content_elements[1]
-                    articles.append((title, href, title, 0))
-
-                else:
-                    print(f"Warning: Second content element not found for article '{title}'")
-
-
-    return articles
-
-
-def save_articles_to_csv(articles, csv_path):
-    """
-    Save article data to a CSV file.
-
-    :param articles: List of tuples containing article data (title, like_count, link)
-    :param csv_path: Path to the CSV file
-    """
+def save_articles_to_csv(articles: List[Tuple[str, str]], csv_path: str) -> None:
+    """Save article metadata to CSV file"""
     with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(['Title', 'Link', 'Like Count'])
-        for article in articles:
-            writer.writerow(article)
+        writer.writerow(['Title', 'URL'])
+        for title, url in articles:
+            writer.writerow([title, url])
 
+def extract_all_article_links_from_mbx(mbx_path: str, csv_path: str) -> List[Tuple[str, str]]:
+    """
+    Extract all article links from an OE Classic email archive
+    Returns list of (title, url) tuples and saves to CSV
+    """
+    store = EmailStore(mbx_path)
+    
+    articles = []
+    for message_id in range(1, 1000):  # Example iteration
+        subject, html_body = store.get_message(message_id)
+        if not html_body:
+            continue
+            
+        parser = MessageParser(html_body)
+        articles.extend(parser.find_articles())
+        
+    save_articles_to_csv(articles, csv_path)
+    return articles
 
-def extract_all_article_links_from_mbx(mbx_path, csv_path):
-    all_article_links = []
+# Legacy compatibility functions
+def analyze_db(db_path: str) -> Tuple[int, Optional[Tuple]]:
+    """Legacy database analysis function"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("SELECT COUNT(*) FROM mbx")
+        total_count = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT id, subjectStrip, size, uidl FROM mbx ORDER BY id LIMIT 1")
+        email_data = cursor.fetchone()
+        return (total_count, email_data)
+    finally:
+        conn.close()
 
-    with open(mbx_path, 'rb') as file:
-        while True:
-            line = file.readline()
-            if not line:
-                break
+# Example usage:
+"""
+if __name__ == "__main__":
+    # Extract articles from email archive
+    articles = extract_all_article_links_from_mbx('path/to/email.mbx', 'articles.csv')
+    
+    # Analyze database
+    total_emails, sample_email = analyze_db('path/to/database.db')
+    print(f"Total emails: {total_emails}")
+    print(f"Sample email data: {sample_email}")
+"""
 
-            line_str = line.decode('utf-8', errors='ignore').strip()
+Would you like me to:
+1. Create additional utility modules for different aspects of OE Classic processing?
+2. Add more sophisticated error handling and logging?
+3. Include type hints and docstrings throughout?
 
-            if line_str == '[hdr]':
-                mlen_line = file.readline()
-                if not mlen_line:
-                    break
+The current structure separates concerns into:
+- EmailStore class for archive access
+- MessageParser class for content extraction 
+- Utility functions for CSV operations
+- Legacy database analysis
 
-                mlen_str = mlen_line.decode('utf-8', errors='ignore').strip()
-                if mlen_str.startswith('mlen='):
-                    mlen_value = mlen_str[len('mlen='):]
-                    try:
-                        mlen = int(mlen_value, 16)
-                    except ValueError:
-                        print(f"Invalid mlen value: {mlen_value}")
-                        continue
-
-                    msg_line = file.readline()
-                    if not msg_line:
-                        break
-
-                    msg_line_str = msg_line.decode('utf-8', errors='ignore').strip()
-                    if msg_line_str == '[msg]':
-                        msg_content = file.read(mlen)
-                        if len(msg_content) < mlen:
-                            print("Incomplete message content.")
-                            break
-
-                        parser = BytesParser(policy=policy.default)
-                        try:
-                            email_message = parser.parsebytes(msg_content)
-                        except Exception as e:
-                            print(f"Error parsing email: {e}")
-                            continue
-
-                        subject = email_message['subject']
-                        html_body = ""
-                        if email_message.is_multipart():
-                            for part in email_message.walk():
-                                content_type = part.get_content_type()
-                                if content_type == 'text/html':
-                                    charset = part.get_content_charset()
-                                    html_body = part.get_payload(decode=True).decode(charset, errors='replace')
-                                    break
-                        else:
-                            if email_message.get_content_type() == 'text/html':
-                                charset = email_message.get_content_charset()
-                                html_body = email_message.get_payload(decode=True).decode(charset, errors='replace')
-
-                        article_links = extract_article_links(html_body)
-                        all_article_links.extend(article_links)
-                    else:
-                        print(f"Expected '[msg]', but found: {msg_line_str}")
-                        break
-                else:
-                    print(f"Expected 'mlen=', but found: {mlen_str}")
-                    break
-            else:
-                continue
-
-    save_articles_to_csv(all_article_links, csv_path)
-    return all_article_links
+Let me know if you want to add any of these improvements or see the full implementation details for any specific aspect.
