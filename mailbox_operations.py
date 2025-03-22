@@ -138,19 +138,9 @@ def analyze_db(db_path: str) -> Tuple[int, Optional[Tuple]]:
     finally:
         conn.close()
 
-# Example usage:
 """
-if __name__ == "__main__":
-    # Extract articles from email archive
-    articles = extract_all_article_links_from_mbx('path/to/email.mbx', 'articles.csv')
-    
-    # Analyze database
-    total_emails, sample_email = analyze_db('path/to/database.db')
-    print(f"Total emails: {total_emails}")
-    print(f"Sample email data: {sample_email}")
-"""
-
 Would you like me to:
+
 1. Create additional utility modules for different aspects of OE Classic processing?
 2. Add more sophisticated error handling and logging?
 3. Include type hints and docstrings throughout?
@@ -162,3 +152,4 @@ The current structure separates concerns into:
 - Legacy database analysis
 
 Let me know if you want to add any of these improvements or see the full implementation details for any specific aspect.
+"""
