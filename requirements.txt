@@ -1,0 +1,15 @@
+# LLM Summary Evaluation Tool Dependencies
+
+# LLM APIs
+ollama>=0.3.0
+openai>=1.0.0
+
+# Web scraping and content processing
+playwright>=1.40.0
+beautifulsoup4>=4.12.0
+
+# HTML parsing
+lxml>=4.9.0
+
+# Testing (optional)
+pytest>=7.0.0
