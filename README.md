@@ -5,11 +5,13 @@ A modular framework for evaluating and comparing text summarization across multi
 ## Features
 
 - **Multi-Source Processing**: Email archives (OE Classic), web URLs, or direct text input
+- **Pre-saved Prompt Evaluation**: Question/answer pairs with dual temperature testing
 - **Multi-Model Support**: Both Ollama (local) and OpenAI models
+- **Analytical & AI-based Scoring**: Word similarity, difflib comparison, and LLM evaluation
 - **Automatic Comparison**: Runs multiple evaluations and highlights unique words between outputs
 - **Medium Integration**: Automatic translation of Medium URLs to Freedium for better access
 - **Interactive CLI**: Menu-driven interface for easy operation
-- **HTML Reports**: Timestamped comparison tables with difference highlighting
+- **HTML Reports**: Timestamped comparison tables with difference highlighting and scoring metrics
 
 ## Quick Start
 
@@ -40,7 +42,8 @@ This launches an interactive CLI with menu options:
 1. **Process Email Archives** - Extract and evaluate articles from OE Classic email files
 2. **Process Web URLs** - Fetch and evaluate content from web pages  
 3. **Process Direct Text/Prompts** - Evaluate custom text or questions
-4. **Configuration** - Manage models, paths, and settings
+4. **Evaluate Pre-saved Prompts** - Test models against question/answer pairs with dual temperature
+5. **Configuration** - Manage models, paths, and settings
 
 ## Architecture
 
@@ -51,11 +54,14 @@ src/
 ├── pipelines/
 │   ├── email_processor.py      # Email archive processing
 │   ├── web_fetcher.py          # Web content fetching
-│   └── evaluator.py            # LLM evaluation pipeline
+│   ├── evaluator.py            # LLM evaluation pipeline
+│   └── prompt_evaluator.py     # Pre-saved prompt evaluation
 ├── core/
 │   ├── models.py               # Model management
 │   ├── output.py               # HTML generation
 │   └── utils.py                # Shared utilities
+├── data/
+│   └── question_bank.json      # Pre-saved question/answer pairs
 └── config/settings.py          # Configuration management
 ```
 
@@ -64,6 +70,7 @@ src/
 - **Email Pipeline**: Extracts articles from OE Classic .mbx files
 - **Web Pipeline**: Fetches content using Playwright with popup handling
 - **Evaluation Pipeline**: Runs content through multiple models with timing analysis
+- **Prompt Evaluation Pipeline**: Tests models against pre-saved question/answer pairs with dual temperature testing (0.0 for consistency, 0.8 for creativity)
 
 ## Configuration
 
@@ -83,6 +90,9 @@ Generates timestamped HTML reports with:
 - Side-by-side model comparisons
 - Execution timing for each model
 - Highlighting of unique words/phrases between outputs
+- **Prompt Evaluation Scoring**: Analytical metrics (word/character similarity) and AI-based evaluation using gemma3:27b-it-q4_K_M
+- **Temperature Comparison**: Shows consistency vs creativity in model responses
+- Summary statistics and category-based performance analysis
 - Automatic browser opening for immediate viewing
 
 ## Legacy Support

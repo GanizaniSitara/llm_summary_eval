@@ -1,0 +1,98 @@
+{
+  "basic_reasoning": [
+    {
+      "id": "br_001",
+      "question": "What is 2 + 2?",
+      "expected_answer": "4",
+      "category": "arithmetic",
+      "scoring_criteria": "Exact numerical match required",
+      "difficulty": "easy"
+    },
+    {
+      "id": "br_002", 
+      "question": "What is the capital of France?",
+      "expected_answer": "Paris",
+      "category": "geography",
+      "scoring_criteria": "Must mention Paris, case insensitive",
+      "difficulty": "easy"
+    },
+    {
+      "id": "br_003",
+      "question": "Complete this sentence: The quick brown fox jumps over the...",
+      "expected_answer": "lazy dog",
+      "category": "completion",
+      "scoring_criteria": "Should contain 'lazy dog' or similar",
+      "difficulty": "easy"
+    }
+  ],
+  "programming_concepts": [
+    {
+      "id": "pc_001",
+      "question": "What does API stand for?",
+      "expected_answer": "Application Programming Interface",
+      "category": "definitions",
+      "scoring_criteria": "Must include the full expansion and explain purpose",
+      "difficulty": "medium"
+    },
+    {
+      "id": "pc_002",
+      "question": "What is the difference between a list and a tuple in Python?",
+      "expected_answer": "Lists are mutable (can be changed), tuples are immutable (cannot be changed)",
+      "category": "technical",
+      "scoring_criteria": "Must mention mutability as key difference",
+      "difficulty": "medium"
+    },
+    {
+      "id": "pc_003",
+      "question": "Explain what happens when you call 'git commit' without the -m flag?",
+      "expected_answer": "It opens the default text editor to write a commit message",
+      "category": "tools",
+      "scoring_criteria": "Must mention text editor opening",
+      "difficulty": "medium"
+    }
+  ],
+  "logical_reasoning": [
+    {
+      "id": "lr_001",
+      "question": "If all roses are flowers and all flowers need water, do roses need water?",
+      "expected_answer": "Yes, roses need water",
+      "category": "logic",
+      "scoring_criteria": "Must correctly follow logical syllogism",
+      "difficulty": "medium"
+    },
+    {
+      "id": "lr_002",
+      "question": "A train leaves New York at 3 PM traveling at 60 mph. Another train leaves Chicago at 4 PM traveling at 80 mph toward New York. If the cities are 800 miles apart, when will they meet?",
+      "expected_answer": "They will meet at 9:40 PM",
+      "category": "word_problems", 
+      "scoring_criteria": "Should show calculation and arrive at correct time",
+      "difficulty": "hard"
+    },
+    {
+      "id": "lr_003",
+      "question": "You have a 3-gallon jug and a 5-gallon jug. How do you measure exactly 4 gallons?",
+      "expected_answer": "Fill 5-gallon jug, pour into 3-gallon jug (leaving 2 gallons), empty 3-gallon jug, pour the 2 gallons into it, fill 5-gallon jug again, pour into 3-gallon jug until full (adds 1 gallon), leaving exactly 4 gallons in the 5-gallon jug",
+      "category": "puzzles",
+      "scoring_criteria": "Must describe correct sequence of steps",
+      "difficulty": "hard"
+    }
+  ],
+  "creative_writing": [
+    {
+      "id": "cw_001",
+      "question": "Write a haiku about coding",
+      "expected_answer": "A three-line poem with 5-7-5 syllable structure about programming",
+      "category": "poetry",
+      "scoring_criteria": "Must follow haiku format (5-7-5 syllables) and relate to coding",
+      "difficulty": "medium"
+    },
+    {
+      "id": "cw_002",
+      "question": "Explain quantum computing to a 5-year-old",
+      "expected_answer": "Simple explanation using analogies and avoiding technical jargon",
+      "category": "explanation",
+      "scoring_criteria": "Must use age-appropriate language and analogies",
+      "difficulty": "hard"
+    }
+  ]
+}

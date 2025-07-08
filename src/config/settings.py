@@ -39,7 +39,7 @@ class Settings:
         self.mail_num_records = 1
         self.repetitions = 3  # For non-OpenAI models
         
-        # Alternative prompt sets for evaluation
+        # Alternative prompt sets for evaluation (legacy format)
         self.prompt_sets = {
             "product_vision": [
                 "Rate the relevance of the provided document to **documenting product vision** on a scale of 0 to 100...",
@@ -66,6 +66,11 @@ class Settings:
                 # Add more prompts as needed
             ]
         }
+        
+        # Prompt evaluation configuration
+        self.question_bank_path = 'src/data/question_bank.json'
+        self.evaluation_model = "gemma3:27b-it-q4_K_M"  # Local Ollama model for AI-based evaluation
+        self.evaluation_temperatures = [0.0, 0.8]  # Zero temperature for consistency, normal for creativity
         
     def display_settings(self):
         """Display current configuration settings."""
