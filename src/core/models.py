@@ -135,3 +135,47 @@ class ModelManager:
                 print(f"Warning: Model '{model}' not found in available models")
                 
         return validated
+        
+    def generate_response(self, model: str, system_prompt: str, user_prompt: str, temperature: float = None) -> str:
+        """
+        Generate a response from the specified model (alias for get_completion).
+        
+        Args:
+            model: Model identifier
+            system_prompt: System prompt for the model
+            user_prompt: User prompt
+            temperature: Temperature override (optional)
+            
+        Returns:
+            Model response text
+        """
+        # Store original temperature if override provided
+        original_temp = self.settings.temperature
+        if temperature is not None:
+            self.settings.temperature = temperature
+            
+        try:
+            # Use get_completion with user_prompt as the text content
+            result = self.get_completion(
+                text=user_prompt,  # Put the prompt content in text parameter
+                model=model,
+                system_prompt=system_prompt,
+                user_prompt=""  # Empty user_prompt to avoid duplication
+            )
+            return result
+        finally:
+            # Restore original temperature
+            if temperature is not None:
+                self.settings.temperature = original_temp
+                
+    def is_model_available(self, model: str) -> bool:
+        """
+        Check if a model is available (alias for test_model_availability).
+        
+        Args:
+            model: Model identifier
+            
+        Returns:
+            True if model is available, False otherwise
+        """
+        return self.test_model_availability(model)

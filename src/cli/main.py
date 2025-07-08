@@ -46,7 +46,7 @@ class CLIDriver:
         print("3. Process Direct Text/Prompts")
         print("4. Evaluate Pre-saved Prompts")
         print("5. Configuration")
-        print("6. Exit")
+        print("q. Quit")
         print("="*50)
         
     def run_email_pipeline(self):
@@ -236,7 +236,7 @@ class CLIDriver:
         while True:
             try:
                 self.display_main_menu()
-                choice = input("Select option (1-6): ").strip()
+                choice = input("Select option (1-5, q): ").strip()
                 
                 if choice == "1":
                     self.run_email_pipeline()
@@ -248,7 +248,7 @@ class CLIDriver:
                     self.run_evaluation_pipeline()
                 elif choice == "5":
                     self.show_configuration()
-                elif choice == "6":
+                elif choice.lower() == "q":
                     print("Goodbye!")
                     break
                 else:
